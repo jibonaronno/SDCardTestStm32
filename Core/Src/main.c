@@ -201,7 +201,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	//HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ad1_raw, adcChannelCount);
 	if(flag_saving == 1)
 	{
-		keepWriting(&log_file, (int)ad1);
+		;//keepWriting(&log_file, (int)ad1);
 	}
 }
 
@@ -299,7 +299,7 @@ int main(void)
     HAL_TIM_Base_Start(&htim2);
 
 
-    myprintf("\r\n~ SD card demo by kiwih ~\r\n\r\n");
+    myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
 
     HAL_Delay(500); //a short delay is important to let the SD card settle
 
@@ -308,30 +308,32 @@ int main(void)
     FIL fil; 		//File handle
     FRESULT fres; //Result after operations
     UINT bytesWrote;
+/*********************************************************/
     //Open the file system
-    fres = f_mount(&FatFs, "", 1); //1=mount now
-    if (fres != FR_OK) {
-  	myprintf("f_mount error (%i)\r\n", fres);
-  	while(1);
-    }
+//    fres = f_mount(&FatFs, "", 1); //1=mount now
+//    if (fres != FR_OK) {
+//  	myprintf("f_mount error (%i)\r\n", fres);
+//  	while(1);
+//    }
+/*********************************************************/
 
+/*********************************************************/
     //Let's get some statistics from the SD card
-    DWORD free_clusters, free_sectors, total_sectors;
-
-    FATFS* getFreeFs;
-
-    fres = f_getfree("", &free_clusters, &getFreeFs);
-    if (fres != FR_OK)
-    {
-    	myprintf("f_getfree error (%i)\r\n", fres);
-    	while(1);
-    }
+//    DWORD free_clusters, free_sectors, total_sectors;
+//    FATFS* getFreeFs;
+//    fres = f_getfree("", &free_clusters, &getFreeFs);
+//    if (fres != FR_OK)
+//    {
+//    	myprintf("f_getfree error (%i)\r\n", fres);
+//    	while(1);
+//    }
+/*********************************************************/
 
     //Formula comes from ChaN's documentation
-    total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
-    free_sectors = free_clusters * getFreeFs->csize;
+    ////total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+    ////free_sectors = free_clusters * getFreeFs->csize;
 
-    myprintf("SD card stats:\r\n%10lu KiB total drive space.\r\n%10lu KiB available.\r\n", total_sectors / 2, free_sectors / 2);
+    ////myprintf("SD card stats:\r\n%10lu KiB total drive space.\r\n%10lu KiB available.\r\n", total_sectors / 2, free_sectors / 2);
 
     //Now let's try to open file "test.txt"
   /*  fres = f_open(&fil, "test.txt", FA_READ);
@@ -343,7 +345,7 @@ int main(void)
     myprintf("I was able to open 'test.txt' for reading!\r\n");
 	*/
     //Read 30 bytes from "test.txt" on the SD card
-    BYTE readBuf[30];
+    ////BYTE readBuf[30];
 
     //We can either use f_read OR f_gets to get data out of files
     //f_gets is a wrapper on f_read that does some string formatting for us
@@ -435,23 +437,23 @@ int main(void)
 		}
 
 
-		if(flag_FallingEdge == 0)
-		{
-			if(getSimplifiedSlope(sawtooth_buf) == 1)
-			{
-				flag_FallingEdge = 1;
-				__dripA = 1;
-
-				if(flag_saving_interval == 0)
-				{
-					file_name_index++;
-					sprintf(log_file_name, "%04d.txt", file_name_index);
-					startWriting(&log_file, log_file_name);
-					flag_saving = 1;
-					flag_saving_interval = 1000000;
-				}
-			}
-		}
+//		if(flag_FallingEdge == 0)
+//		{
+//			if(getSimplifiedSlope(sawtooth_buf) == 1)
+//			{
+//				flag_FallingEdge = 1;
+//				__dripA = 1;
+//
+//				if(flag_saving_interval == 0)
+//				{
+//					file_name_index++;
+//					sprintf(log_file_name, "%04d.txt", file_name_index);
+//					startWriting(&log_file, log_file_name);
+//					flag_saving = 1;
+//					flag_saving_interval = 1000000;
+//				}
+//			}
+//		}
     }
 //  while (1)
 //  {
