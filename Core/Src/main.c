@@ -57,6 +57,8 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 
 uint16_t adraw[2];
+uint8_t uart2_raw[10];
+volatile int rx_flagA = 0;
 
 /* USER CODE END PV */
 
@@ -105,9 +107,9 @@ int32_t sawtooth_buf[200];
 int32_t signal_buf[200];
 int32_t signal_buf1[200];
 int32_t signal_buf2[200];
-int signal_buffer_in_queue = 1;
-int gidxB = 0;
-int gidxA = 0;
+volatile int signal_buffer_in_queue = 1;
+volatile int gidxB = 0;
+volatile int gidxA = 0;
 
 void insert_new_value(int32_t *buf, int32_t new_value)
 {
@@ -210,34 +212,32 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	//insert_new_value(sawtooth_buf, (int32_t)ad1);
 	//insert_new_value(signal_buf, (int32_t)ad2);
 
-	if(gidxB == 200)
+	if(rx_flagA == 0)
 	{
+		if(gidxB == 200)
+		{
+			if(signal_buffer_in_queue == 1)
+			{
+				signal_buffer_in_queue = 2;
+			}
+			else
+			{
+				signal_buffer_in_queue = 1;
+			}
+			gidxB = 0;
+		}
+
 		if(signal_buffer_in_queue == 1)
 		{
-			signal_buffer_in_queue = 2;
+			signal_buf1[gidxB] = ad1;
 		}
 		else
 		{
-			signal_buffer_in_queue = 1;
+			signal_buf2[gidxB] = ad1;
 		}
-		gidxB = 0;
+		gidxB++;
 	}
 
-	if(signal_buffer_in_queue == 1)
-	{
-		signal_buf1[gidxB] = ad1;
-	}
-	else
-	{
-		signal_buf2[gidxB] = ad1;
-	}
-	gidxB++;
-
-	//HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ad1_raw, adcChannelCount);
-	if(flag_saving == 1)
-	{
-		;//keepWriting(&log_file, (int)ad1);
-	}
 	// HAL_ADC_Start_IT(&hadc1);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adraw, adcChannelCount);
 }
@@ -283,6 +283,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart == &huart2)
+	{
+		if(uart2_raw[0] == 'a')
+		{
+			rx_flagA = 1;
+			HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
+		}
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -336,6 +347,7 @@ int main(void)
     HAL_TIM_Base_Start(&htim1);
     HAL_TIM_Base_Start(&htim2);
 
+    HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
 
     //myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
 
@@ -466,6 +478,7 @@ int main(void)
 		if(HAL_GetTick() > (a_shot + 5000))
 		{
 		  a_shot = HAL_GetTick();
+
 //		  if(adcConversionComplete == 1)
 //		  {
 //			  adcConversionComplete = 0;
@@ -478,24 +491,28 @@ int main(void)
 //		  }
 
 		  float t = millis/1000.0;
-
-		  if(adcConversionComplete == 1)
+		  if(rx_flagA == 1)
 		  {
-			  adcConversionComplete = 0;
-			  for(lidxA=0;lidxA<200;lidxA++)
+			  if(adcConversionComplete == 1)
 			  {
-				  //myprintf("A0:%d, A1:%d\n", signal_buf[lidxA], sawtooth_buf[lidxA]);
-				  if(signal_buffer_in_queue == 2)
+				  adcConversionComplete = 0;
+				  for(lidxA=0;lidxA<200;lidxA++)
 				  {
-					  //myprintf("A0:%d\n", signal_buf1[lidxA]);
-					  myprintf("%d\n", signal_buf1[lidxA]);
-				  }
-				  else
-				  {
-					  //myprintf("A0:%d\n", signal_buf2[lidxA]);
-					  myprintf("%d\n", signal_buf2[lidxA]);
+					  //myprintf("A0:%d, A1:%d\n", signal_buf[lidxA], sawtooth_buf[lidxA]);
+					  if(signal_buffer_in_queue == 2)
+					  {
+						  //myprintf("A0:%d\n", signal_buf1[lidxA]);
+						  myprintf("%d\r\n", signal_buf1[lidxA]);
+					  }
+					  else
+					  {
+						  //myprintf("A0:%d\n", signal_buf2[lidxA]);
+						  myprintf("%d\r\n", signal_buf2[lidxA]);
+					  }
 				  }
 			  }
+			  gidxB = 0; // Fresh Copy of ADC
+			  rx_flagA = 0;
 		  }
 		}
 
