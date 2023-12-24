@@ -103,13 +103,31 @@ volatile uint32_t conv_rate = 0;
 uint32_t ad1 = 0;
 uint32_t ad2 = 0;
 
-int32_t sawtooth_buf[200];
+int32_t sawtooth_buf1[200];
+int32_t sawtooth_buf2[200];
 int32_t signal_buf[200];
 int32_t signal_buf1[200];
 int32_t signal_buf2[200];
+int32_t kalman_buf1[200];
+int32_t kalman_buf2[200];
+int32_t peaks_buff[200];
 volatile int signal_buffer_in_queue = 1;
 volatile int gidxB = 0;
 volatile int gidxA = 0;
+
+int FindPeak(uint32_t *sig)
+{
+	int fidxA = 0;
+
+	if((sig[0] < sig[2]) && (sig[4] < sig[2]))
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
 
 void insert_new_value(int32_t *buf, int32_t new_value)
 {
@@ -128,6 +146,45 @@ int file_name_index = 0;
 
 FIL log_file;
 int log_file_opened = 0;
+
+static float ADC_OLD_Value;
+static float P_k1_k1;
+
+static float Q = 0.0001;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
+//static float Q = 0.0005;//Q: Regulation noise, Q increases, dynamic response becomes faster, and convergence stability becomes worse
+static float R = 0.005; //R: Test noise, R increases, dynamic response becomes slower, convergence stability becomes better
+//static float R = 0.2;
+static float Kg = 0;
+static float P_k_k1 = 0.5;
+static float kalman_adc_old=0;
+static int kalman_adc_int = 0;
+
+unsigned long kalman_filter(unsigned long ADC_Value)
+{
+    float x_k1_k1,x_k_k1;
+    //static float ADC_OLD_Value;
+    float Z_k;
+
+
+    float kalman_adc;
+
+    Z_k = ADC_Value;
+    x_k1_k1 = kalman_adc_old;
+
+    x_k_k1 = x_k1_k1;
+    P_k_k1 = P_k1_k1 + Q;
+
+    Kg = P_k_k1/(P_k_k1 + R);
+
+    kalman_adc = x_k_k1 + Kg * (Z_k - kalman_adc_old);
+    P_k1_k1 = (1 - Kg)*P_k_k1;
+    P_k_k1 = P_k1_k1;
+
+    ADC_OLD_Value = ADC_Value;
+    kalman_adc_old = kalman_adc;
+    kalman_adc_int = (int)kalman_adc;
+    return kalman_adc;
+}
 
 int startWriting(FIL *fil, char *fname)
 {
@@ -202,6 +259,36 @@ void DMA_ADC_Complete(DMA_HandleTypeDef *_hdma)
 
 }
 
+int max = 0;
+int min = 5000;
+
+int gmaxA = 0;
+int gminA = 0;
+int midlineA = 0;
+
+int32_t GetMidLine(int32_t *gbuff, uint32_t sz)
+{
+	int lidxA = 0;
+
+	for(lidxA = 1; lidxA<(sz - 1 ); lidxA++)
+	{
+		if(gbuff[lidxA] > max)
+		{
+			max = gbuff[lidxA];
+		}
+	}
+
+	for(lidxA = 1; lidxA<(sz - 1 ); lidxA++)
+	{
+		if(gbuff[lidxA] < min)
+		{
+			min = gbuff[lidxA];
+		}
+	}
+
+	return (((max - min)/2) + min);
+}
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	adcConversionComplete = 1;
@@ -227,13 +314,67 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			gidxB = 0;
 		}
 
+		if(gidxB > 5)
+		{
+			if(kalman_buf1[gidxB] > kalman_buf1[gidxB-3])
+			{
+				//if(kalman_buf1[gidxB] > gmaxA)
+				{
+					gmaxA = kalman_buf1[gidxB];
+				}
+			}
+
+			if(kalman_buf1[gidxB] < kalman_buf1[gidxB-3])
+			{
+				gminA = kalman_buf1[gidxB];
+			}
+		}
+
+		midlineA = (((gmaxA - gminA)/2) + gminA);
+
 		if(signal_buffer_in_queue == 1)
 		{
 			signal_buf1[gidxB] = ad1;
+			sawtooth_buf1[gidxB] = ad2;
+			kalman_buf1[gidxB] = kalman_filter(signal_buf1[gidxB]);
+
+			if((gidxB >= 5) && (gidxB < 190))
+			{
+
+				if(FindPeak(&kalman_buf1[gidxB]) && (kalman_buf1[gidxB] > midlineA))
+				{
+					peaks_buff[gidxB] = 2000;
+				}
+				else
+				{
+					peaks_buff[gidxB] = 500;
+				}
+			}
+			else
+			{
+				peaks_buff[gidxB] = 500;
+			}
 		}
 		else
 		{
 			signal_buf2[gidxB] = ad1;
+			sawtooth_buf2[gidxB] = ad2;
+			kalman_buf2[gidxB] = kalman_filter(signal_buf2[gidxB]);
+			if((gidxB >= 5) && (gidxB < 190))
+			{
+				if(FindPeak(&kalman_buf2[gidxB]) && (kalman_buf2[gidxB] > midlineA))
+				{
+					peaks_buff[gidxB] = 2000;
+				}
+				else
+				{
+					peaks_buff[gidxB] = 500;
+				}
+			}
+			else
+			{
+				peaks_buff[gidxB] = 500;
+			}
 		}
 		gidxB++;
 	}
@@ -293,6 +434,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
 		}
 	}
+	HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	;
 }
 
 /* USER CODE END 0 */
@@ -475,7 +622,7 @@ int main(void)
     {
     	millis = HAL_GetTick();
 
-		if(HAL_GetTick() > (a_shot + 5000))
+		if(HAL_GetTick() > (a_shot + 500))
 		{
 		  a_shot = HAL_GetTick();
 
@@ -502,15 +649,16 @@ int main(void)
 					  if(signal_buffer_in_queue == 2)
 					  {
 						  //myprintf("A0:%d\n", signal_buf1[lidxA]);
-						  myprintf("%d\r\n", signal_buf1[lidxA]);
+						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf1[lidxA], sawtooth_buf1[lidxA], kalman_buf1[lidxA], peaks_buff[lidxA], midlineA); //GetMidLine(kalman_buf1, 200));
 					  }
 					  else
 					  {
 						  //myprintf("A0:%d\n", signal_buf2[lidxA]);
-						  myprintf("%d\r\n", signal_buf2[lidxA]);
+						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf2[lidxA], sawtooth_buf2[lidxA], kalman_buf2[lidxA], peaks_buff[lidxA], midlineA); // GetMidLine(kalman_buf2, 200));
 					  }
 				  }
 			  }
+			  HAL_Delay(2500);
 			  gidxB = 0; // Fresh Copy of ADC
 			  rx_flagA = 0;
 		  }
