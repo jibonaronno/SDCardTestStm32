@@ -120,7 +120,7 @@ int FindPeak(uint32_t *sig)
 {
 	int fidxA = 0;
 
-	if((sig[0] < sig[2]) && (sig[4] < sig[2]))
+	if((sig[0] < sig[1]) && (sig[2] < sig[1]))
 	{
 		return 1;
 	}
@@ -266,6 +266,7 @@ int min = 5000;
 int gmaxA = 0;
 int gminA = 0;
 int midlineA = 0;
+int dripOff = 0;
 
 int32_t GetMidLine(int32_t *gbuff, uint32_t sz)
 {
@@ -348,9 +349,17 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			if((gidxB >= 5) && (gidxB < 190))
 			{
 
-				if(FindPeak(&kalman_buf1[gidxB]) && (kalman_buf1[gidxB] > midlineA))
+				if(FindPeak(&kalman_buf1[gidxB-3]) && (kalman_buf1[gidxB-3] > midlineA))
 				{
-					peaks_buff1[gidxB] = 2000;
+					if(dripOff == 0)
+					{
+						peaks_buff1[gidxB] = 2000;
+						dripOff = 20;
+					}
+					else
+					{
+						peaks_buff1[gidxB] = 500;
+					}
 				}
 				else
 				{
@@ -370,15 +379,23 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 			if(gidxB==0)
 			{
-				gminA = kalman_buf1[0];
-				gmaxA = kalman_buf1[0];
+				gminA = kalman_buf2[0];
+				gmaxA = kalman_buf2[0];
 			}
 
 			if((gidxB >= 5) && (gidxB < 190))
 			{
-				if(FindPeak(&kalman_buf2[gidxB]) && (kalman_buf2[gidxB] > midlineA))
+				if(FindPeak(&kalman_buf2[gidxB-3]) && (kalman_buf2[gidxB-3] > midlineA))
 				{
-					peaks_buff2[gidxB] = 2000;
+					if(dripOff == 0)
+					{
+						peaks_buff2[gidxB] = 2000;
+						dripOff = 20;
+					}
+					else
+					{
+						peaks_buff2[gidxB] = 500;
+					}
 				}
 				else
 				{
@@ -391,6 +408,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			}
 		}
 		gidxB++;
+		if(dripOff > 0)
+		{
+			dripOff--;
+		}
 	}
 
 	// HAL_ADC_Start_IT(&hadc1);
