@@ -110,7 +110,8 @@ int32_t signal_buf1[200];
 int32_t signal_buf2[200];
 int32_t kalman_buf1[200];
 int32_t kalman_buf2[200];
-int32_t peaks_buff[200];
+int32_t peaks_buff1[200];
+int32_t peaks_buff2[200];
 volatile int signal_buffer_in_queue = 1;
 volatile int gidxB = 0;
 volatile int gidxA = 0;
@@ -316,21 +317,21 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 
 		if(gidxB > 5)
 		{
-			if(kalman_buf1[gidxB] > kalman_buf1[gidxB-3])
+			if(gmaxA < kalman_buf1[gidxB])
 			{
-				//if(kalman_buf1[gidxB] > gmaxA)
-				{
-					gmaxA = kalman_buf1[gidxB];
-				}
+				gmaxA = kalman_buf1[gidxB];
 			}
 
-			if(kalman_buf1[gidxB] < kalman_buf1[gidxB-3])
+			if(gminA > kalman_buf1[gidxB])
 			{
 				gminA = kalman_buf1[gidxB];
 			}
 		}
 
-		midlineA = (((gmaxA - gminA)/2) + gminA);
+		if(gidxB == 195)
+		{
+			midlineA = (((gmaxA - gminA)/2) + gminA);
+		}
 
 		if(signal_buffer_in_queue == 1)
 		{
@@ -338,21 +339,27 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			sawtooth_buf1[gidxB] = ad2;
 			kalman_buf1[gidxB] = kalman_filter(signal_buf1[gidxB]);
 
+			if(gidxB==0)
+			{
+				gminA = kalman_buf1[0];
+				gmaxA = kalman_buf1[0];
+			}
+
 			if((gidxB >= 5) && (gidxB < 190))
 			{
 
 				if(FindPeak(&kalman_buf1[gidxB]) && (kalman_buf1[gidxB] > midlineA))
 				{
-					peaks_buff[gidxB] = 2000;
+					peaks_buff1[gidxB] = 2000;
 				}
 				else
 				{
-					peaks_buff[gidxB] = 500;
+					peaks_buff1[gidxB] = 500;
 				}
 			}
 			else
 			{
-				peaks_buff[gidxB] = 500;
+				peaks_buff1[gidxB] = 500;
 			}
 		}
 		else
@@ -360,20 +367,27 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 			signal_buf2[gidxB] = ad1;
 			sawtooth_buf2[gidxB] = ad2;
 			kalman_buf2[gidxB] = kalman_filter(signal_buf2[gidxB]);
+
+			if(gidxB==0)
+			{
+				gminA = kalman_buf1[0];
+				gmaxA = kalman_buf1[0];
+			}
+
 			if((gidxB >= 5) && (gidxB < 190))
 			{
 				if(FindPeak(&kalman_buf2[gidxB]) && (kalman_buf2[gidxB] > midlineA))
 				{
-					peaks_buff[gidxB] = 2000;
+					peaks_buff2[gidxB] = 2000;
 				}
 				else
 				{
-					peaks_buff[gidxB] = 500;
+					peaks_buff2[gidxB] = 500;
 				}
 			}
 			else
 			{
-				peaks_buff[gidxB] = 500;
+				peaks_buff2[gidxB] = 500;
 			}
 		}
 		gidxB++;
@@ -649,12 +663,12 @@ int main(void)
 					  if(signal_buffer_in_queue == 2)
 					  {
 						  //myprintf("A0:%d\n", signal_buf1[lidxA]);
-						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf1[lidxA], sawtooth_buf1[lidxA], kalman_buf1[lidxA], peaks_buff[lidxA], midlineA); //GetMidLine(kalman_buf1, 200));
+						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf1[lidxA], sawtooth_buf1[lidxA], kalman_buf1[lidxA], peaks_buff1[lidxA], midlineA); //GetMidLine(kalman_buf1, 200));
 					  }
 					  else
 					  {
 						  //myprintf("A0:%d\n", signal_buf2[lidxA]);
-						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf2[lidxA], sawtooth_buf2[lidxA], kalman_buf2[lidxA], peaks_buff[lidxA], midlineA); // GetMidLine(kalman_buf2, 200));
+						  myprintf("%d,%d,%d,%d,%d\r\n", signal_buf2[lidxA], sawtooth_buf2[lidxA], kalman_buf2[lidxA], peaks_buff2[lidxA], midlineA); // GetMidLine(kalman_buf2, 200));
 					  }
 				  }
 			  }
