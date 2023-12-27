@@ -59,6 +59,7 @@ UART_HandleTypeDef huart2;
 uint16_t adraw[2];
 uint8_t uart2_raw[10];
 volatile int rx_flagA = 0;
+volatile int rx_flagB = 0;
 
 /* USER CODE END PV */
 
@@ -115,6 +116,8 @@ int32_t peaks_buff2[200];
 volatile int signal_buffer_in_queue = 1;
 volatile int gidxB = 0;
 volatile int gidxA = 0;
+
+volatile uint32_t relative_sawtooth_voltage = 0;
 
 int FindPeak(uint32_t *sig)
 {
@@ -355,6 +358,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 					{
 						peaks_buff1[gidxB] = 2000;
 						dripOff = 20;
+						relative_sawtooth_voltage = (3300000 / 4096) * sawtooth_buf1[gidxB-3]; // sawtooth_buf1[gidxB-3]; //
 					}
 					else
 					{
@@ -390,6 +394,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 					if(dripOff == 0)
 					{
 						peaks_buff2[gidxB] = 2000;
+						relative_sawtooth_voltage = (3300000 / 4096) * sawtooth_buf2[gidxB-3]; // sawtooth_buf2[gidxB-3]; //
 						dripOff = 20;
 					}
 					else
@@ -466,7 +471,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		if(uart2_raw[0] == 'a')
 		{
 			rx_flagA = 1;
-			HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
+			//HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
+		}
+
+		if(uart2_raw[0] == 'b')
+		{
+			rx_flagB = 1;
+			//HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
 		}
 	}
 	HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
@@ -696,6 +707,14 @@ int main(void)
 			  HAL_Delay(2500);
 			  gidxB = 0; // Fresh Copy of ADC
 			  rx_flagA = 0;
+			  rx_flagB = 0;
+		  }
+
+		  if(rx_flagB == 1)
+		  {
+			  myprintf("Sawtooth Voltage : %d\r\n", relative_sawtooth_voltage);
+			  HAL_Delay(100);
+			  rx_flagB = 0;
 		  }
 		}
 
