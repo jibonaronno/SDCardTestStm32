@@ -53,6 +53,7 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
+USART_HandleTypeDef husart3;
 
 /* USER CODE BEGIN PV */
 
@@ -73,6 +74,7 @@ static void MX_ADC1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_USART3_Init(void);
 /* USER CODE BEGIN PFP */
 void myprintf(const char *fmt, ...);
 /* USER CODE END PFP */
@@ -88,6 +90,7 @@ void myprintf(const char *fmt, ...) {
 
   int len = strlen(buffer);
   HAL_UART_Transmit(&huart2, (uint8_t*)buffer, len, -1);
+  //HAL_UART_Transmit(&husart3, (uint8_t*)buffer, len, -1);
 
 }
 
@@ -533,6 +536,7 @@ int main(void)
   MX_RTC_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
+  MX_USART3_Init();
   /* USER CODE BEGIN 2 */
 
   	//HAL_ADC_Start_IT(&hadc1);
@@ -542,7 +546,9 @@ int main(void)
 
     HAL_UART_Receive_IT(&huart2, uart2_raw, 1);
 
-    //myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
+    myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
+    myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
+    myprintf("\r\n~ ADC Peak Detector ~\r\n\r\n");
 
     HAL_Delay(500); //a short delay is important to let the SD card settle
 
@@ -668,7 +674,7 @@ int main(void)
     {
     	millis = HAL_GetTick();
 
-		if(HAL_GetTick() > (a_shot + 500))
+		if(HAL_GetTick() > (a_shot + 1000))
 		{
 		  a_shot = HAL_GetTick();
 
@@ -712,11 +718,13 @@ int main(void)
 
 		  if(rx_flagB == 1)
 		  {
-			  myprintf("Sawtooth Voltage : %d\r\n", relative_sawtooth_voltage);
+			  myprintf("Freq : %d\r\n", ((relative_sawtooth_voltage * 417) + 550000));
 			  HAL_Delay(100);
 			  rx_flagB = 0;
 		  }
 		}
+
+		myprintf("Freq : %d\r\n", ((relative_sawtooth_voltage * 417) + 550000));
 
 
 //		if(flag_FallingEdge == 0)
@@ -1163,6 +1171,40 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  husart3.Instance = USART3;
+  husart3.Init.BaudRate = 115200;
+  husart3.Init.WordLength = USART_WORDLENGTH_8B;
+  husart3.Init.StopBits = USART_STOPBITS_1;
+  husart3.Init.Parity = USART_PARITY_NONE;
+  husart3.Init.Mode = USART_MODE_TX_RX;
+  husart3.Init.CLKPolarity = USART_POLARITY_LOW;
+  husart3.Init.CLKPhase = USART_PHASE_1EDGE;
+  husart3.Init.CLKLastBit = USART_LASTBIT_DISABLE;
+  if (HAL_USART_Init(&husart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -1192,6 +1234,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
